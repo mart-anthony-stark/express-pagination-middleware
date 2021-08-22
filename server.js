@@ -1,27 +1,42 @@
 const express = require('express')
 const app = express()
+const mongoose = require('mongoose')
+const User = require('./users')
 
-const users = [
-    {id: 1, name: 'user 1'},
-    {id: 2, name: 'user 2'},
-    {id: 3, name: 'user 3'},
-    {id: 4, name: 'user 4'},
-    {id: 5, name: 'user 5'},
-    {id: 6, name: 'user 6'},
-    {id: 7, name: 'user 7'},
-    {id: 8, name: 'user 8'},
-    {id: 9, name: 'user 9'},
-    {id: 10, name: 'user 10'},
-]
+mongoose.connect('', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    useCreateIndex: true
+})
 
-app.get('/users', paginatedResults(users), (req,res)=>{
+const db = mongoose.connection
+db.once('open', async()=>{
+    if(await User.countDocuments().exec() > 0) return
+
+    Promise.all([
+        User.create({ name: 'User 1' }),
+        User.create({ name: 'User 2' }),
+        User.create({ name: 'User 3' }),
+        User.create({ name: 'User 4' }),
+        User.create({ name: 'User 5' }),
+        User.create({ name: 'User 6' }),
+        User.create({ name: 'User 7' }),
+        User.create({ name: 'User 8' }),
+        User.create({ name: 'User 9' }),
+        User.create({ name: 'User 10' }),
+        User.create({ name: 'User 11' }),
+        User.create({ name: 'User 12' }),
+    ]).then(() => console.log('Added users'))
+})
+
+app.get('/users', paginatedResults(User), (req,res)=>{
     res.json(res.paginatedResults)
 })
 
 
 // PAGINATION MIDDLEWARE
 function paginatedResults(model){
-    return (req,res,next) => {
+    return async(req,res,next) => {
         const page = parseInt(req.query.page)
         const limit = parseInt(req.query.limit)
 
@@ -30,7 +45,7 @@ function paginatedResults(model){
 
         const results = {}
 
-        if(endIndex < model.length){
+        if(endIndex < await model.countDocuments().exec()){
             results.next = {
                 page: page + 1,
                 limit: limit
@@ -44,10 +59,13 @@ function paginatedResults(model){
             }
         }
 
-
-        results.results = model.slice(startIndex, endIndex)
-        res.paginatedResults = results
-        next()
+        try{
+            results.results = await model.find().limit(limit).skip(startIndex).exec()
+            res.paginatedResults = results
+            next()
+        } catch(err){
+            res.status(500).json({ message: err.message })
+        }
     }
 }
 
